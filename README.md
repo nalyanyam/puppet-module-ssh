@@ -4,7 +4,6 @@ Manage ssh client and server.
 
 The module uses exported resources to manage ssh keys and removes ssh keys that are not managed by puppet. This behavior is managed by the parameters ssh_key_ensure and purge_keys.
 
-===
 
 # Compatability #
 
@@ -14,8 +13,8 @@ This module has been tested to work on the following systems with Puppet v3.
  * EL 6
  * SLES 11
  * Ubuntu 12.04 LTS
+ * Solaris 9, 10 and 11
 
-===
 
 # Parameters #
 

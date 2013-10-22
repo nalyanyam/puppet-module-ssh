@@ -17,17 +17,19 @@ class ssh (
   $sshd_config_path                 = '/etc/ssh/sshd_config',
   $sshd_config_owner                = 'root',
   $sshd_config_group                = 'root',
-  $sshd_config_mode                 = '0600',
+  $sshd_config_mode                 = 'USE_DEFAULTS',
   $sshd_config_syslog_facility      = 'AUTH',
   $sshd_config_login_grace_time     = '120',
   $sshd_config_challenge_resp_auth  = 'no',
   $sshd_config_print_motd           = 'yes',
   $sshd_config_use_dns              = 'yes',
-  $sshd_config_banner               = 'none',
-  $sshd_config_xauth_location       = '/usr/bin/xauth',
+  $sshd_config_banner               = 'USE_DEFAULTS',
+  $sshd_config_xauth_location       = 'USE_DEFAULTS',
   $sshd_config_subsystem_sftp       = 'USE_DEFAULTS',
-  $service_ensure                   = 'running',
+  $ssh_package_source               = 'USE_DEFAULTS',
+  $ssh_package_adminfile            = 'USE_DEFAULTS',
   $service_name                     = 'USE_DEFAULTS',
+  $service_ensure                   = 'running',
   $service_enable                   = 'true',
   $service_hasrestart               = 'true',
   $service_hasstatus                = 'true',
@@ -74,10 +76,17 @@ class ssh (
                                               'openssh-clients']
       $default_sshd_config_subsystem_sftp = '/usr/libexec/openssh/sftp-server'
       $default_service_name               = 'sshd'
+      $default_sshd_config_xauth_location = '/usr/bin/xauth'
+      $default_sshd_config_mode           = '0600'
+      $default_sshd_config_banner         = 'none'
+
     }
     'Suse': {
-      $default_packages     = 'openssh'
-      $default_service_name = 'sshd'
+      $default_packages                   = 'openssh'
+      $default_service_name               = 'sshd'
+      $default_sshd_config_xauth_location = '/usr/bin/xauth'
+      $default_sshd_config_mode           = '0600'
+      $default_sshd_config_banner         = 'none'
       case $::architecture {
         'x86_64': {
           $default_sshd_config_subsystem_sftp = '/usr/lib64/ssh/sftp-server'
@@ -90,6 +99,30 @@ class ssh (
         }
       }
     }
+    'Solaris': {
+      case $::kernelrelease  {
+              '5.9': {
+                  $default_service_name           = 'sshd'
+              }
+              '5.10','5.11': {
+                  $default_service_name           = 'ssh'
+              }
+              default: {
+                fail("The ntp module supports Solaris kernel release 5.9, 5.10 and 5.11. You are running ${::kernelrelease}.")
+              }
+      }
+      $default_packages                   = ['SUNWsshcu',
+                                              'SUNWsshdr',
+                                              'SUNWsshdu',
+                                              'SUNWsshr',
+                                              'SUNWsshu']
+      $default_sshd_config_subsystem_sftp = '/usr/lib/ssh/sftp-server'
+      $default_ssh_package_source         = '/var/spool/pkg'
+      $default_ssh_package_adminfile      = '/var/sadm/install/admin/puppet-ntp'
+      $default_sshd_config_xauth_location = '/usr/openwin/bin/xauth'
+      $default_sshd_config_mode           = '0644'
+      $default_sshd_config_banner         = '/etc/issue'
+    }
     'Debian': {
       case $::operatingsystem {
         'Ubuntu': {
@@ -97,6 +130,8 @@ class ssh (
                                                   'openssh-client']
           $default_sshd_config_subsystem_sftp = '/usr/lib/openssh/sftp-server'
           $default_service_name               = 'ssh'
+          $default_sshd_config_mode           = '0644'
+          $default_sshd_config_banner         = 'none'
         }
         default: {
           fail("ssh supports Debian variant Ubuntu. Your osfamily is <${::osfamily}> and operatingsystem is <${::operatingsystem}>.")
@@ -104,8 +139,32 @@ class ssh (
       }
     }
     default: {
-      fail("ssh supports osfamilies RedHat, Suse and Debian. Detected osfamily is <${::osfamily}>.")
+      fail("ssh supports osfamilies RedHat, Suse, Debian and Solaris. Detected osfamily is <${::osfamily}>.")
     }
+  }
+
+  if $ssh_package_source == 'USE_DEFAULTS' {
+    $ssh_package_source_real = $default_ssh_package_source
+  } else {
+    $ssh_package_source_real = $ssh_package_source
+  }
+
+  if $sshd_config_mode    == 'USE_DEFAULTS' {
+    $sshd_config_mode_real = $default_sshd_config_mode
+  } else {
+    $sshd_config_mode_real = $sshd_config_mode
+  }
+
+  if $sshd_config_banner    == 'USE_DEFAULTS' {
+    $sshd_config_banner_real = $default_sshd_config_banner
+  } else {
+    $sshd_config_banner_real = $sshd_config_banner
+  }
+
+  if $ssh_package_adminfile == 'USE_DEFAULTS' {
+    $ssh_package_adminfile_real = $default_ssh_package_adminfile
+  } else {
+    $ssh_package_adminfile_real = $ssh_package_adminfile
   }
 
   if $packages == 'USE_DEFAULTS' {
@@ -126,9 +185,17 @@ class ssh (
     $sshd_config_subsystem_sftp_real = $sshd_config_subsystem_sftp
   }
 
+  if $sshd_config_xauth_location == 'USE_DEFAULTS' {
+    $sshd_config_xauth_location_real = $default_sshd_config_xauth_location
+  } else {
+    $sshd_config_xauth_location_real = $sshd_config_xauth_location
+  }
+
   package { 'ssh_packages':
-    ensure => installed,
-    name   => $packages_real,
+    ensure        => installed,
+    name          => $packages_real,
+    source        => $ssh_package_source_real,
+    adminfile     => $ssh_package_adminfile_real,
   }
 
   file  { 'ssh_config' :
@@ -144,7 +211,7 @@ class ssh (
   file  { 'sshd_config' :
     ensure  => file,
     path    => $sshd_config_path,
-    mode    => $sshd_config_mode,
+    mode    => $sshd_config_mode_real,
     owner   => $sshd_config_owner,
     group   => $sshd_config_group,
     content => template('ssh/sshd_config.erb'),
