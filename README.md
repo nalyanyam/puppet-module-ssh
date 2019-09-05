@@ -59,7 +59,7 @@ A value of `'USE_DEFAULTS'` will use the defaults specified by the module.
 
 hiera_merge
 -----------
-Boolean to merges all found instances of ssh::keys and ssh::config_entries in Hiera.
+Boolean to merge all found instances of ssh::keys and ssh::config_entries in Hiera.
 This is useful for specifying SSH keys at different levels of the hierarchy and having
 them all included in the catalog.
 
